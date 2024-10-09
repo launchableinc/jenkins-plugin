@@ -8,24 +8,34 @@ import hudson.tasks.BuildStep;
 import hudson.tasks.junit.JUnitResultArchiver;
 
 import javax.inject.Inject;
-import java.io.File;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+/**
+ * This gets invoked when classic "freestyle" project runs its step
+ */
 @Extension
 public class BuildStepListenerImpl extends BuildStepListener {
     @Inject
-    Configuration configuration;
+    Ingester ingester;
 
     public void started(AbstractBuild build, BuildStep bs, BuildListener listener) {
         // noop
     }
 
     public void finished(AbstractBuild build, BuildStep bs, BuildListener listener, boolean canContinue) {
-        if (bs instanceof JUnitResultArchiver) {
-            File report = new File(build.getRootDir(), "junitResult.xml");
-            if (!report.exists())       return; // be defensive just in case
-
-            // TODO
-            System.out.println("Sending "+report+" to Launchable");
+        try {
+            // if somebody configured JUnit result archiving step we hit here,
+            // so we just slurp the result unprocessed to the server side.
+            if (bs instanceof JUnitResultArchiver) {
+                ingester.slurp(build.getRootDir());
+            }
+        } catch (IOException e) {
+            // Priority #1: Do no harm to people's build
+            LOGGER.log(Level.WARNING, "Failed to send JUnit result to Launchable", e);
         }
     }
+
+    private static final Logger LOGGER = Logger.getLogger("io.jenkins.plugins.launchable.BuildStepListenerImpl");
 }
