@@ -6,6 +6,8 @@ import hudson.model.BuildListener;
 import hudson.model.BuildStepListener;
 import hudson.tasks.BuildStep;
 import hudson.tasks.junit.JUnitResultArchiver;
+import net.sf.json.JSON;
+import net.sf.json.JSONObject;
 
 import javax.inject.Inject;
 import java.io.IOException;
@@ -29,7 +31,7 @@ public class BuildStepListenerImpl extends BuildStepListener {
             // if somebody configured JUnit result archiving step we hit here,
             // so we just slurp the result unprocessed to the server side.
             if (bs instanceof JUnitResultArchiver) {
-                ingester.slurp(build.getRootDir());
+                ingester.slurp(build.getRootDir(), new PropsBuilder<>(build));
             }
         } catch (IOException e) {
             // Priority #1: Do no harm to people's build
