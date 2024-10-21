@@ -46,35 +46,41 @@ public class Ingester extends GlobalConfiguration {
      * @param properties Additional contextual data to submit along with the test results.
      */
     /*package*/ void slurp(File dir, PropsBuilder<?> properties) throws IOException {
-        File report = new File(dir, "junitResult.xml");
-        if (!report.exists()) return; // be defensive just in case
+        try {
+            File report = new File(dir, "junitResult.xml");
+            if (!report.exists()) return; // be defensive just in case
 
-        if (apiKey==null)     return; // not yet configured
+            if (apiKey==null)     return; // not yet configured
 
-        // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
-        // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
+            // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
+            try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
 
-            String endpoint = System.getenv("INSIGHT_UPLOAD_URL");
-            if (endpoint==null) {
-                endpoint = DEFAULT_UPLOAD_URL;
-            }
-            var hc = new HttpPost(endpoint);
+                String endpoint = System.getenv("INSIGHT_UPLOAD_URL");
+                if (endpoint==null) {
+                    endpoint = DEFAULT_UPLOAD_URL;
+                }
+                var hc = new HttpPost(endpoint);
 
-            var builder = MultipartEntityBuilder.create();
-            builder.addTextBody("metadata", properties.build().toString(), ContentType.APPLICATION_JSON);
-            builder.addBinaryBody("file", report, ContentType.APPLICATION_XML, "junitResult.xml");
+                var builder = MultipartEntityBuilder.create();
+                builder.addTextBody("metadata", properties.build().toString(), ContentType.APPLICATION_JSON);
+                builder.addBinaryBody("file", report, ContentType.APPLICATION_XML, "junitResult.xml");
 
-            hc.setEntity(new GzipCompressingEntity(builder.build()));
-            hc.addHeader("Authorization", "Bearer " + apiKey.getPlainText());
+                hc.setEntity(new GzipCompressingEntity(builder.build()));
+                hc.addHeader("Authorization", "Bearer " + apiKey.getPlainText());
 
-            try (CloseableHttpResponse response = httpClient.execute(hc)) {
-                if (response.getStatusLine().getStatusCode() >= 300) {
-                    // treat redirect as an error, for the time being. we submit a big payload, so we don't want
-                    // to be forced to repeat the payload after we send the whole thing once.
-                    LOGGER.log(Level.WARNING, "Failed to submit test results: {0}", response.getStatusLine());
+                try (CloseableHttpResponse response = httpClient.execute(hc)) {
+                    if (response.getStatusLine().getStatusCode() >= 300) {
+                        // treat redirect as an error, for the time being. we submit a big payload, so we don't want
+                        // to be forced to repeat the payload after we send the whole thing once.
+                        LOGGER.log(Level.WARNING, "Failed to submit test results: {0}", response.getStatusLine());
+                    }
                 }
             }
+        } catch (Exception e) {
+            // don't let our bug get in the way of orderly execution of jobs, as that'd be the fasest way to
+            // get kicked out of installations.
+            LOGGER.log(Level.WARNING, "Failed to submit test results", e);
         }
     }
 
