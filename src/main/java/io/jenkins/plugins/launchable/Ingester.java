@@ -49,6 +49,8 @@ public class Ingester extends GlobalConfiguration {
         File report = new File(dir, "junitResult.xml");
         if (!report.exists()) return; // be defensive just in case
 
+        if (apiKey==null)     return; // not yet configured
+
         // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
         // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
