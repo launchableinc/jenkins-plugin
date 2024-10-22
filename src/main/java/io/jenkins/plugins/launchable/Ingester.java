@@ -52,15 +52,18 @@ public class Ingester extends GlobalConfiguration {
 
             if (apiKey==null)     return; // not yet configured
 
+            OrganizationWorkspace orgWs = OrganizationWorkspace.fromApiKey(apiKey.getPlainText());
+
             // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
             // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
             try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+                String endpoint = System.getenv("INSIGHT_UPLOAD_URL") ;
 
-                String endpoint = System.getenv("INSIGHT_UPLOAD_URL");
                 if (endpoint==null) {
                     endpoint = DEFAULT_UPLOAD_URL;
                 }
-                HttpPost hc = new HttpPost(endpoint);
+                HttpPost hc = new HttpPost(String.format("%s/intake/organizations/%s/workspaces/%s/events/jenkins", endpoint, orgWs.getOrganization(), orgWs.getWorkspace()));
+
 
                 MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                 builder.addTextBody("metadata", properties.build().toString(), ContentType.APPLICATION_JSON);
@@ -86,4 +89,40 @@ public class Ingester extends GlobalConfiguration {
 
     private static final Logger LOGGER = Logger.getLogger(Ingester.class.getName());
     private static final String DEFAULT_UPLOAD_URL = "https://api.mercury.launchableinc.com/TODO";
+
+    private static class OrganizationWorkspace {
+        private String organization;
+
+        private String workspace;
+
+        private OrganizationWorkspace() {
+        }
+
+        private OrganizationWorkspace(String organization, String workspace) {
+            this.organization = organization;
+            this.workspace = workspace;
+        }
+
+        static OrganizationWorkspace fromApiKey(String key) {
+            String[] splits = key.split(":", 3);
+            if (!(splits.length == 3)) {
+                return new OrganizationWorkspace();
+            }
+
+            String[] user = splits[1].split("/",2);
+            if (!(user.length == 2)) {
+                return new OrganizationWorkspace();
+            }
+
+            return new OrganizationWorkspace(user[0], user[1]);
+        }
+
+        public String getOrganization() {
+            return organization;
+        }
+
+        public String getWorkspace() {
+            return workspace;
+        }
+    }
 }
