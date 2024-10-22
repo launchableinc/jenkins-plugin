@@ -77,7 +77,7 @@ public class Ingester extends GlobalConfiguration {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             // don't let our bug get in the way of orderly execution of jobs, as that'd be the fasest way to
             // get kicked out of installations.
             LOGGER.log(Level.WARNING, "Failed to submit test results", e);
