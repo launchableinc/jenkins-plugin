@@ -60,9 +60,9 @@ public class Ingester extends GlobalConfiguration {
                 if (endpoint==null) {
                     endpoint = DEFAULT_UPLOAD_URL;
                 }
-                var hc = new HttpPost(endpoint);
+                HttpPost hc = new HttpPost(endpoint);
 
-                var builder = MultipartEntityBuilder.create();
+                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                 builder.addTextBody("metadata", properties.build().toString(), ContentType.APPLICATION_JSON);
                 builder.addBinaryBody("file", report, ContentType.APPLICATION_XML, "junitResult.xml");
 
