@@ -28,6 +28,9 @@
         <artifactId>maven-hpi-plugin</artifactId>
         <configuration>
           <defaultPort>8081</defaultPort>
+          <systemProperties>
+            <INSIGHT_UPLOAD_URL>http://localhost:8080</INSIGHT_UPLOAD_URL>
+          </systemProperties>
         </configuration>
       </plugin>
     </plugins>

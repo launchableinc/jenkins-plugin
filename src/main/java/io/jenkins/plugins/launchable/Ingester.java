@@ -24,6 +24,10 @@ import java.util.logging.Logger;
 public class Ingester extends GlobalConfiguration {
     private Secret apiKey;
 
+    public Ingester() {
+        load();
+    }
+
     public Secret getApiKey() {
         return apiKey;
     }
@@ -54,7 +58,7 @@ public class Ingester extends GlobalConfiguration {
             // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
             // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
             try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-                String endpoint = System.getenv("INSIGHT_UPLOAD_URL") ;
+                String endpoint = System.getProperty("INSIGHT_UPLOAD_URL") ;
 
                 if (endpoint==null) {
                     endpoint = DEFAULT_UPLOAD_URL;
