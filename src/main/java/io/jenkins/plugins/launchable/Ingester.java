@@ -1,21 +1,19 @@
 package io.jenkins.plugins.launchable;
 
 import hudson.Extension;
-import hudson.model.Descriptor;
 import hudson.tasks.junit.TestResult;
 import hudson.util.Secret;
-import hudson.util.TextFile;
 import jenkins.model.GlobalConfiguration;
 import net.sf.json.JSONObject;
-import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.client.entity.GzipCompressingEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
+import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.kohsuke.stapler.StaplerRequest;
 
 import java.io.File;
@@ -52,22 +50,25 @@ public class Ingester extends GlobalConfiguration {
 
             if (apiKey==null)     return; // not yet configured
 
+            OrganizationWorkspace orgWs = OrganizationWorkspace.fromApiKey(apiKey.getPlainText());
+
             // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
             // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
             try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+                String endpoint = System.getenv("INSIGHT_UPLOAD_URL") ;
 
-                String endpoint = System.getenv("INSIGHT_UPLOAD_URL");
                 if (endpoint==null) {
                     endpoint = DEFAULT_UPLOAD_URL;
                 }
-                var hc = new HttpPost(endpoint);
+                HttpPost hc = new HttpPost(String.format("%s/intake/organizations/%s/workspaces/%s/events/jenkins", endpoint, orgWs.getOrganization(), orgWs.getWorkspace()));
 
-                var builder = MultipartEntityBuilder.create();
+                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                 builder.addTextBody("metadata", properties.build().toString(), ContentType.APPLICATION_JSON);
                 builder.addBinaryBody("file", report, ContentType.APPLICATION_XML, "junitResult.xml");
 
                 hc.setEntity(new GzipCompressingEntity(builder.build()));
                 hc.addHeader("Authorization", "Bearer " + apiKey.getPlainText());
+                hc.setHeader(HttpHeaders.CONTENT_ENCODING, "gzip");
 
                 try (CloseableHttpResponse response = httpClient.execute(hc)) {
                     if (response.getStatusLine().getStatusCode() >= 300) {
@@ -77,7 +78,7 @@ public class Ingester extends GlobalConfiguration {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             // don't let our bug get in the way of orderly execution of jobs, as that'd be the fasest way to
             // get kicked out of installations.
             LOGGER.log(Level.WARNING, "Failed to submit test results", e);
@@ -86,4 +87,40 @@ public class Ingester extends GlobalConfiguration {
 
     private static final Logger LOGGER = Logger.getLogger(Ingester.class.getName());
     private static final String DEFAULT_UPLOAD_URL = "https://api.mercury.launchableinc.com/TODO";
+
+    private static class OrganizationWorkspace {
+        private String organization;
+
+        private String workspace;
+
+        private OrganizationWorkspace() {
+        }
+
+        private OrganizationWorkspace(String organization, String workspace) {
+            this.organization = organization;
+            this.workspace = workspace;
+        }
+
+        static OrganizationWorkspace fromApiKey(String key) {
+            String[] splits = key.split(":", 3);
+            if (!(splits.length == 3)) {
+                return new OrganizationWorkspace();
+            }
+
+            String[] user = splits[1].split("/",2);
+            if (!(user.length == 2)) {
+                return new OrganizationWorkspace();
+            }
+
+            return new OrganizationWorkspace(user[0], user[1]);
+        }
+
+        public String getOrganization() {
+            return organization;
+        }
+
+        public String getWorkspace() {
+            return workspace;
+        }
+    }
 }
