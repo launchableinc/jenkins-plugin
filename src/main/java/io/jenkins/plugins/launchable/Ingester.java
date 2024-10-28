@@ -67,7 +67,6 @@ public class Ingester extends GlobalConfiguration {
 
                 hc.setEntity(new GzipCompressingEntity(builder.build()));
                 hc.addHeader("Authorization", "Bearer " + apiKey.getPlainText());
-                hc.setHeader(HttpHeaders.CONTENT_ENCODING, "gzip");
 
                 try (CloseableHttpResponse response = httpClient.execute(hc)) {
                     if (response.getStatusLine().getStatusCode() >= 300) {
