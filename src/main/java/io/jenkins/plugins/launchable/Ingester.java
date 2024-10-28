@@ -10,7 +10,6 @@ import org.apache.http.client.entity.GzipCompressingEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -78,7 +77,7 @@ public class Ingester extends GlobalConfiguration {
                     }
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             // don't let our bug get in the way of orderly execution of jobs, as that'd be the fasest way to
             // get kicked out of installations.
             LOGGER.log(Level.WARNING, "Failed to submit test results", e);
