@@ -10,7 +10,6 @@ import org.apache.http.client.entity.GzipCompressingEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -24,6 +23,10 @@ import java.util.logging.Logger;
 @Extension
 public class Ingester extends GlobalConfiguration {
     private Secret apiKey;
+
+    public Ingester() {
+        load();
+    }
 
     public Secret getApiKey() {
         return apiKey;
@@ -55,7 +58,7 @@ public class Ingester extends GlobalConfiguration {
             // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
             // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
             try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-                String endpoint = System.getenv("INSIGHT_UPLOAD_URL") ;
+                String endpoint = System.getProperty("INSIGHT_UPLOAD_URL") ;
 
                 if (endpoint==null) {
                     endpoint = DEFAULT_UPLOAD_URL;
@@ -68,7 +71,6 @@ public class Ingester extends GlobalConfiguration {
 
                 hc.setEntity(new GzipCompressingEntity(builder.build()));
                 hc.addHeader("Authorization", "Bearer " + apiKey.getPlainText());
-                hc.setHeader(HttpHeaders.CONTENT_ENCODING, "gzip");
 
                 try (CloseableHttpResponse response = httpClient.execute(hc)) {
                     if (response.getStatusLine().getStatusCode() >= 300) {
@@ -78,7 +80,7 @@ public class Ingester extends GlobalConfiguration {
                     }
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             // don't let our bug get in the way of orderly execution of jobs, as that'd be the fasest way to
             // get kicked out of installations.
             LOGGER.log(Level.WARNING, "Failed to submit test results", e);
