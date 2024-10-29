@@ -5,11 +5,8 @@ import hudson.tasks.junit.TestResult;
 import hudson.util.Secret;
 import jenkins.model.GlobalConfiguration;
 import net.sf.json.JSONObject;
-import org.apache.http.HttpHeaders;
-import org.apache.http.client.entity.GzipCompressingEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -19,6 +16,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static org.apache.http.entity.ContentType.APPLICATION_JSON;
+import static org.apache.http.entity.ContentType.APPLICATION_OCTET_STREAM;
 
 @Extension
 public class Ingester extends GlobalConfiguration {
@@ -66,10 +66,10 @@ public class Ingester extends GlobalConfiguration {
                 HttpPost hc = new HttpPost(String.format("%s/intake/organizations/%s/workspaces/%s/events/jenkins", endpoint, orgWs.getOrganization(), orgWs.getWorkspace()));
 
                 MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-                builder.addTextBody("metadata", properties.build().toString(), ContentType.APPLICATION_JSON);
-                builder.addBinaryBody("file", report, ContentType.APPLICATION_XML, "junitResult.xml");
+                builder.addTextBody("metadata", properties.build().toString(), APPLICATION_JSON);
+                builder.addPart("file", new GzipFileMimePart(report, APPLICATION_OCTET_STREAM, "junitResult.xml.gz"));
 
-                hc.setEntity(new GzipCompressingEntity(builder.build()));
+                hc.setEntity(builder.build());
                 hc.addHeader("Authorization", "Bearer " + apiKey.getPlainText());
 
                 try (CloseableHttpResponse response = httpClient.execute(hc)) {
