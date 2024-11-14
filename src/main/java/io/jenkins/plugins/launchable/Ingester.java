@@ -88,7 +88,7 @@ public class Ingester extends GlobalConfiguration {
     }
 
     private static final Logger LOGGER = Logger.getLogger(Ingester.class.getName());
-    private static final String DEFAULT_UPLOAD_URL = "https://api.mercury.launchableinc.com/TODO";
+    private static final String DEFAULT_UPLOAD_URL = "https://api.mercury.launchableinc.com";
 
     private static class OrganizationWorkspace {
         private String organization;
