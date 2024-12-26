@@ -4,6 +4,7 @@ import hudson.Extension;
 import hudson.tasks.junit.TestResult;
 import hudson.util.Secret;
 import jenkins.model.GlobalConfiguration;
+import jenkins.util.Timer;
 import net.sf.json.JSONObject;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -17,6 +18,7 @@ import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static java.util.logging.Level.*;
 import static org.apache.http.entity.ContentType.APPLICATION_JSON;
 import static org.apache.http.entity.ContentType.APPLICATION_OCTET_STREAM;
 
@@ -47,44 +49,45 @@ public class Ingester extends GlobalConfiguration {
      * @param properties Additional contextual data to submit along with the test results.
      */
     /*package*/ void slurp(File dir, PropsBuilder<?> properties) throws IOException {
-        try {
-            File report = new File(dir, "junitResult.xml");
-            if (!report.exists()) return; // be defensive just in case
+        File report = new File(dir, "junitResult.xml");
+        if (!report.exists()) return; // be defensive just in case
 
-            if (apiKey==null)     return; // not yet configured
+        Timer.get().execute(() -> {// don't slow down people's builds and risk getting kicked out
+            try {
+                if (apiKey==null)     return; // not yet configured
+                OrganizationWorkspace orgWs = OrganizationWorkspace.fromApiKey(apiKey.getPlainText());
 
-            OrganizationWorkspace orgWs = OrganizationWorkspace.fromApiKey(apiKey.getPlainText());
+                // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
+                // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
+                try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+                    String endpoint = System.getProperty("INSIGHT_UPLOAD_URL") ;
 
-            // attempted to use JDK HttpRequest, but gave up due to the lack of multipart support
-            // TODO: how do I obtain a properly configured HttpClient for the proxy setting in Jenkins?
-            try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-                String endpoint = System.getProperty("INSIGHT_UPLOAD_URL") ;
+                    if (endpoint==null) {
+                        endpoint = DEFAULT_UPLOAD_URL;
+                    }
+                    HttpPost hc = new HttpPost(String.format("%s/intake/organizations/%s/workspaces/%s/events/jenkins", endpoint, orgWs.getOrganization(), orgWs.getWorkspace()));
 
-                if (endpoint==null) {
-                    endpoint = DEFAULT_UPLOAD_URL;
-                }
-                HttpPost hc = new HttpPost(String.format("%s/intake/organizations/%s/workspaces/%s/events/jenkins", endpoint, orgWs.getOrganization(), orgWs.getWorkspace()));
+                    MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+                    builder.addTextBody("metadata", properties.build().toString(), APPLICATION_JSON);
+                    builder.addPart("file", new GzipFileMimePart(report, APPLICATION_OCTET_STREAM, "junitResult.xml.gz"));
 
-                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-                builder.addTextBody("metadata", properties.build().toString(), APPLICATION_JSON);
-                builder.addPart("file", new GzipFileMimePart(report, APPLICATION_OCTET_STREAM, "junitResult.xml.gz"));
+                    hc.setEntity(builder.build());
+                    hc.addHeader("Authorization", "Bearer " + apiKey.getPlainText());
 
-                hc.setEntity(builder.build());
-                hc.addHeader("Authorization", "Bearer " + apiKey.getPlainText());
-
-                try (CloseableHttpResponse response = httpClient.execute(hc)) {
-                    if (response.getStatusLine().getStatusCode() >= 300) {
-                        // treat redirect as an error, for the time being. we submit a big payload, so we don't want
-                        // to be forced to repeat the payload after we send the whole thing once.
-                        LOGGER.log(Level.WARNING, "Failed to submit test results: {0}", response.getStatusLine());
+                    try (CloseableHttpResponse response = httpClient.execute(hc)) {
+                        if (response.getStatusLine().getStatusCode() >= 300) {
+                            // treat redirect as an error, for the time being. we submit a big payload, so we don't want
+                            // to be forced to repeat the payload after we send the whole thing once.
+                            LOGGER.log(WARNING, "Failed to submit test results: {0}", response.getStatusLine());
+                        }
                     }
                 }
+            } catch (Exception e) {
+                // don't let our bug get in the way of orderly execution of jobs, as that'd be the fasest way to
+                // get kicked out of installations.
+                LOGGER.log(WARNING, "Failed to submit test results", e);
             }
-        } catch (Exception e) {
-            // don't let our bug get in the way of orderly execution of jobs, as that'd be the fasest way to
-            // get kicked out of installations.
-            LOGGER.log(Level.WARNING, "Failed to submit test results", e);
-        }
+        });
     }
 
     private static final Logger LOGGER = Logger.getLogger(Ingester.class.getName());
