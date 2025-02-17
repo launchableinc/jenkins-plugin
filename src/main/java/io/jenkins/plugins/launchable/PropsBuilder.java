@@ -1,6 +1,9 @@
 package io.jenkins.plugins.launchable;
 
+import hudson.model.Item;
+import hudson.model.Job;
 import hudson.model.Run;
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
 /**
@@ -28,6 +31,22 @@ class PropsBuilder<B extends Run<?,?>> {
     protected JSONObject buildJobProperties() {
         return new JSONObject()
             .accumulate("fullName", run.getParent().getFullName())
-            .accumulate("type", run.getParent().getClass().getName());
+            .accumulate("type", run.getParent().getClass().getName())
+            .accumulate("components", buildJobComponents(run.getParent()));
+    }
+
+    private JSONArray buildJobComponents(Item i) {
+        JSONArray a = new JSONArray();
+        while (true) {
+            a.add(0, new JSONObject()
+                .accumulate("name", i.getName())
+                .accumulate("type", i.getClass().getName()));
+
+            if (i.getParent() instanceof Item) {
+                i = (Item) i.getParent();
+            } else {
+                return a;
+            }
+        }
     }
 }
